@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ahmetorunov743.github.io/WebCraft/sitemap.xml
