@@ -60,7 +60,8 @@
         </ul>
 
         <div class="vip-card">
-          <button type="button" class="vip-google-btn" data-google-btn>
+          <!-- Кнопка входа через Google теперь полностью управляется через Firebase -->
+          <button type="button" class="vip-google-btn" id="firebase-google-btn">
             <svg viewBox="0 0 18 18" aria-hidden="true">
               <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
               <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
@@ -183,7 +184,170 @@
     </div>
   </main>
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="script.js"></script>
+  <!-- Firebase SDKs -->
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "firebase/app";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDnLGZKjSG79kqCBF9LAKs47EsVdKfMdws",
+      authDomain: "orvena-digital.firebaseapp.com",
+      projectId: "orvena-digital",
+      storageBucket: "orvena-digital.firebasestorage.app",
+      messagingSenderId: "169284611133",
+      appId: "1:169284611133:web:5fe09a07840d639b71ce54",
+      measurementId: "G-BBDHGSY7QC"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // DOM refs
+    const gate = document.querySelector('[data-vip-gate]');
+    const dashboard = document.querySelector('[data-vip-dashboard]');
+    const googleBtn = document.getElementById('firebase-google-btn');
+    const signOutBtn = document.querySelector('[data-vip-signout]');
+    const statusMsg = document.querySelector('[data-gsi-status]');
+    const vipName = document.querySelector('[data-vip-name]');
+    const vipEmail = document.querySelector('[data-vip-email]');
+    const vipAvatar = document.querySelector('[data-vip-avatar]');
+
+    // Show/hide views
+    function showGate() {
+      if (gate) gate.style.display = 'block';
+      if (dashboard) dashboard.style.display = 'none';
+    }
+
+    function showDashboard(user) {
+      if (gate) gate.style.display = 'none';
+      if (dashboard) dashboard.style.display = 'block';
+      if (user) {
+        const name = user.displayName || user.email || 'VIP клиент';
+        const email = user.email || '';
+        const initial = name.charAt(0).toUpperCase();
+        vipName.textContent = name;
+        vipEmail.textContent = email;
+        vipAvatar.textContent = initial;
+      }
+    }
+
+    // Sign in with Google
+    async function signInWithGoogle() {
+      try {
+        statusMsg.textContent = 'Вход...';
+        const result = await signInWithPopup(auth, provider);
+        statusMsg.textContent = '';
+        showDashboard(result.user);
+      } catch (error) {
+        console.error('Google sign-in error:', error);
+        statusMsg.textContent = `Ошибка: ${error.message}`;
+      }
+    }
+
+    // Sign out
+    async function signOutUser() {
+      try {
+        await signOut(auth);
+        showGate();
+      } catch (error) {
+        console.error('Sign out error:', error);
+      }
+    }
+
+    // Auth state listener
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        showDashboard(user);
+      } else {
+        showGate();
+      }
+    });
+
+    // Event listeners
+    if (googleBtn) googleBtn.addEventListener('click', signInWithGoogle);
+    if (signOutBtn) signOutBtn.addEventListener('click', signOutUser);
+
+    // ---- email login (demo) ----
+    const emailToggle = document.querySelector('[data-email-toggle]');
+    const emailForm = document.querySelector('[data-vip-email-form]');
+    if (emailToggle && emailForm) {
+      emailToggle.addEventListener('click', () => {
+        emailForm.style.display = emailForm.style.display === 'block' ? 'none' : 'block';
+      });
+      emailForm.style.display = 'none';
+      emailForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = emailForm.querySelector('input[type="email"]');
+        if (input && input.value) {
+          // Demo: fake login with email
+          const fakeUser = {
+            displayName: input.value.split('@')[0] || 'Пользователь',
+            email: input.value,
+          };
+          showDashboard(fakeUser);
+          // Update UI with fake data
+          vipName.textContent = fakeUser.displayName;
+          vipEmail.textContent = fakeUser.email;
+          vipAvatar.textContent = fakeUser.displayName.charAt(0).toUpperCase();
+        }
+      });
+    }
+
+    // ---- calculator logic (existing) ----
+    function updateTotal() {
+      const siteType = document.querySelector('input[name="vip-site-type"]:checked');
+      const design = document.querySelector('input[name="vip-design"]:checked');
+      const addons = document.querySelectorAll('input[name="vip-addon"]:checked');
+
+      let base = 0;
+      let time = '';
+      if (siteType) {
+        base = parseInt(siteType.closest('.vip-option-card').querySelector('.vip-opt-price').textContent.replace(/[^0-9]/g, ''));
+        time = siteType.dataset.time || '—';
+      }
+      let designPrice = 0;
+      if (design && design.value === 'custom') {
+        designPrice = 100;
+      }
+      let addonPrice = 0;
+      addons.forEach(el => {
+        const price = parseInt(el.closest('.vip-option-card').querySelector('.vip-opt-price').textContent.replace(/[^0-9]/g, ''));
+        addonPrice += price;
+      });
+      const total = base + designPrice + addonPrice;
+      const totalEl = document.querySelector('[data-vip-total-amount]');
+      const timeEl = document.querySelector('[data-vip-total-time]');
+      if (totalEl) totalEl.textContent = '$' + total;
+      if (timeEl) timeEl.textContent = 'Срок: ' + time;
+    }
+
+    document.querySelectorAll('input[name="vip-site-type"], input[name="vip-design"], input[name="vip-addon"]').forEach(el => {
+      el.addEventListener('change', updateTotal);
+    });
+    updateTotal();
+
+    // submit button
+    const submitBtn = document.querySelector('[data-vip-submit]');
+    const statusBadge = document.querySelector('[data-vip-status]');
+    if (submitBtn && statusBadge) {
+      submitBtn.addEventListener('click', () => {
+        statusBadge.textContent = 'Заявка отправлена!';
+        statusBadge.dataset.status = 'sent';
+        statusBadge.style.color = '#6fcf97';
+      });
+    }
+  </script>
 </body>
-</html>
+  </html>
